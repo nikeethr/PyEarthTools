@@ -143,7 +143,6 @@ class LightingTraining(LightningWrapper, TrainingWrapper):
             load (bool | str, optional):
                 Whether to load most recent checkpoint file in checkpoint dir, or specified checkpoint file. Defaults to True.
         """
-
         if load:
             if isinstance(load, bool):
                 latest_path = self._find_latest_path(self.path)

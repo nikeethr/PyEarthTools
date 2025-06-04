@@ -58,7 +58,7 @@ class FourCastNextRM(pyearthtools.zoo.BaseForecastModel):
         lead_time: int | str,
         ckpt_path: str | None = None,
         interval: int = 6,
-        lightning_model_params={},
+        lightning_model_params=None,
         **kwargs,
     ) -> None:
         """
@@ -71,6 +71,8 @@ class FourCastNextRM(pyearthtools.zoo.BaseForecastModel):
             interval: Data interval in hours. Defaults to 6.
             ckpt_path: Override for weights path
         """
+        if lightning_model_params is None:
+            lightning_model_params = {}
         self.lead_time = pyearthtools.zoo.utils.delta_conversion(lead_time, "hour")
         if ckpt_path:
             self._redownload_each_time = True
@@ -78,7 +80,7 @@ class FourCastNextRM(pyearthtools.zoo.BaseForecastModel):
 
         self.ckpt_path = ckpt_path
         self.lightning_model_params = lightning_model_params
-        self.lightning_model = fourcastnext.FourCastNextLM(self.lightning_model_params)
+        self.lightning_model = fourcastnext.FourCastNextLM(model_params=self.lightning_model_params)
 
         self.interval = interval
 

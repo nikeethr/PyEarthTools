@@ -24,7 +24,7 @@ import xarray as xr
 # [comment - NR] : merely for lock testing. Python could be using threads OR processes and its hard to tell, sometimes both.
 #                  I'm guessing its processes that need to be locked. In HPC, threads are processes anyway.
 #                  an alternate is to use a filelock...
-import multiprocessing as mp
+import torch.multiprocessing as mp
 
 # [comment - NR]: define lock - I'm not sure if this is early enough...
 #                               I'm not sure if Lock is singleton - it really should be called near the entry point
@@ -41,11 +41,13 @@ FILE = Union[str, Path]
 
 T = TypeVar("T", xr.Dataset, xr.DataArray)
 
-@functools.lru_cache
-def get_cached_file_data(f: FILE):
-    # lock will be bypassed if/when cache is hit - this is okay since there is no IO
-    with _LOCK:
-        return xr.load_dataset(parse_path(f))
+@functools.cache
+def get_dat_cache(f: FILE):
+    return xr.load_dataset(parse_path(f))
+
+def get_dat_locked_cache(f: FILE):
+    with __LOCK:
+        return get_dat_locked_cache(f)
 
 class xarrayNormalisation(Operation):
     """
@@ -60,7 +62,7 @@ class xarrayNormalisation(Operation):
         # [comment - NR] fitting everything in memory for now - should use
         #                cache instead, but its not super necessary since these
         #                values should be static in theory
-        return get_cached_file_data(file)
+        return get_dat_locked_cache(file)
 
         # return xr.open_dataset(parse_path(file))
 
@@ -110,7 +112,13 @@ class MagicNorm(xarrayNormalisation):
     Denormalise accordingly
     """
 
-    def __init__(self, cache_dir=".", samples_needed=20):
+    def __init__(
+        self,
+        cache_dir=".",
+        samples_needed=20,
+        eager=True, # -- [comment - NR]: recommended eager loading if using multiprocessing
+        eager_loader=None, # -- [comment - NR]: callable that should return a loaded dataset
+    ):
         super().__init__()
         self.record_initialisation()
         self.vars = {}
@@ -133,6 +141,11 @@ class MagicNorm(xarrayNormalisation):
                 self.mean = xr.load_dataset(self.means_filename)
                 self.deviation = xr.load_dataset(self.deviation_filename)
                 self.samples_needed = 0
+
+        # TODO: eager loading
+        if eager:
+            pass
+
 
     def update_norms(self, sample):
         # Return early if norms already well calculated

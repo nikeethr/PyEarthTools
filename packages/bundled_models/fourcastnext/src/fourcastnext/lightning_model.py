@@ -43,13 +43,16 @@ torch.set_float32_matmul_precision("medium")
 class FourCastNextLM(pl.LightningModule):
     def __init__(
         self,
-        model_params: dict = {},
         *,
+        # [comment NR: Using dict would maintain stale state - we don't want that]
+        # Also this should happen after '*'
+        model_params: dict = None,
         base_lr=1e-3,
-        grad_accum_schedule=None,
+        grad_accum_schedule = None,
         precision=32,
         loss_function: str = "L1Loss",
-        loss_kwargs: dict = {},
+        # [comment NR: Using dict would maintain stale state - we don't want that]
+        loss_kwargs: dict = None,
     ):
         """
         FourCastNeXt model
@@ -72,6 +75,11 @@ class FourCastNextLM(pl.LightningModule):
             loss_kwargs (dict, optional):
                 Kwargs to pass to the loss function. Defaults to {}.
         """
+        fn_empty_dict_if_none = lambda _x: {} if _x is None else _x
+        model_params = fn_empty_dict_if_none(model_params)
+        loss_kwargs = fn_empty_dict_if_none(loss_kwargs)
+        grad_accum_schedule = fn_empty_dict_if_none(grad_accum_schedule)
+
         super().__init__()
         self.save_hyperparameters()
 

@@ -1,33 +1,3 @@
-#!/usr/bin/env python
-# coding: utf-8
-
-# # Train and run a simplified global weather model (low hardware and data requirements)
-# 
-# This notebook has been tested on a 4GB GPU in a Linux environment and uses less than 3GB of training data. This notebook has also been tested in an HPC facility. There is currently a known intermittent issue on Mac hardware.
-# 
-# Overview:
-# - Downloading training data (takes a few minutes)
-# - Training a neural network to predict global weather conditions (takes around 30-60 minutes per epoch)
-# - Inferencing the network on unseen data (takes only a moment)
-# - This tutorial uses a simplied model to allow users to explore how PyEarthTools works, with comparatively low data and hardware requirements.
-# 
-# ## Summary
-# 
-# ### Choice of Data
-# This tutorial allows the user to download a 2.8GB file (or 6.4GB if you choose to use additional variables). The data contains around 60 years of global Earth system analysis data. The term "analysis" means the science community's best estimate of historical weather conditions based on available observations. The analysis data set used here was originally produced by the [European Centre for Medium Range Weather Forecasting (ECMWF)](https://www.ecmwf.int/en/forecasts/dataset/ecmwf-reanalysis-v5). This is a standard data set used in the field, however most research is done on a higher-resolution version of the data. That said, valuable research is also done using the lower resolution data. The spatial (latitude and longitude) resolution of this data is 64 pixels by 32 pixels, but the time series is very long. Only a few of the most interesting variables are downloaded in this notebook, to reduce how much data must be downloaded and stored.
-# 
-# The data is made available by the ECMWF under license, and the conditions are described here: https://www.ecmwf.int/en/forecasts/accessing-forecasts/licences-available . Please review this before making use of the data for anything. In this tutorial, the data is downloaded using instructions from the WeatherBench 2 data guide. Please see https://weatherbench2.readthedocs.io/en/latest/data-guide.html for more information on the data, open access, and accessing other resolutions of the data.
-# 
-# ### Choice of Model (and Caveats)
-# 
-# This tutorial uses a simplified version of FourCastNeXt. FourCastNeXt ([Guo et al. 2024](https://doi.org/10.48550/arXiv.2401.05584)) is a high-resolution global weather model (https://doi.org/10.48550/arXiv.2401.05584). It was originally trained using data with a spatial resolution of 1440x720. It was trained using four NVidia V100 GPUs (40GB cards) for 35 hours. 
-# 
-# This tutorial adapts and simplifies the original FourCastNeXt architecture. The model has been simplified so that this tutorial can be run with much lower requirements for hardware, data volumes and time. As the model has been simplied, its outputs are not as accurate as the original model. However, the purpose of this tutorial is to allow users to explore how PyEarthTools works, with comparatively low data and hardware requirements. 
-# 
-
-# In[1]:
-
-
 import os
 
 # IMPORTANT! Set this to where you want to store your copy of the data!
@@ -195,7 +165,7 @@ splits = {
 datamodule = pyearthtools.training.data.lightning.PipelineLightningDataModule(
     data_pipeline,
     **splits,
-    **{'num_workers': 8, 'batch_size': 32}
+    **{'num_workers': 32, 'batch_size': 256}
 )
 
 
@@ -217,7 +187,7 @@ model = fourcastnext.registered_model.FourCastNextRM(
                               'out_channels': 4, # Increase this if using additional data
                               'embed_dim': 768, 
                               'num_blocks': 4,  
-                              'patch_size': (2,1),  # Change this to (4,4) if the GPU memory is exceeded
+                              'patch_size': (2,2),  # Change this to (4,4) if the GPU memory is exceeded
                               'depth': 12,
                              },
     output='.',
