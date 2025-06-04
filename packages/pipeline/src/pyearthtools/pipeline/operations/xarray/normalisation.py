@@ -180,6 +180,27 @@ class MagicNorm(xarrayNormalisation):
 
     def normalise(self, sample):
 
+        # ---
+        # [comment - NR]:
+        #
+        # should keep updating self.deviation until there are
+        # enough to calculate a non-zero deviation even then it should not be
+        # statistically sparse (i.e. the deviation is only explained by a few
+        # entries, and the rest match the mean exactly. Can happen with
+        # something like precipitation with low number of samples and a bad
+        # starting point.)
+        #
+        # I would be surprised if there weren't existing metrics to test for
+        # appropriate stratification for valid var/std calculations.
+        #
+        # Alternatively we can use application specific stratification i.e. by
+        # random sampling over space and time.
+        #
+        # In this regard I prefer if normalisation is calculated in a "eager"
+        # step rather than part of an iterative pipeline. It can be quite
+        # trivially done before any sampling, especially if the aim is to avoid
+        # inconsistencies.
+        # ---
         if self.sample_count < self.samples_needed:
             self.update_norms(sample)
 
