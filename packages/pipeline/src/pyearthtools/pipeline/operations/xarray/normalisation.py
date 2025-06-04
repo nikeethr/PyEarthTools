@@ -46,7 +46,7 @@ def get_dat_cache(f: FILE):
     return xr.load_dataset(parse_path(f))
 
 def get_dat_locked_cache(f: FILE):
-    with __LOCK:
+    with _LOCK:
         return get_dat_locked_cache(f)
 
 class xarrayNormalisation(Operation):
