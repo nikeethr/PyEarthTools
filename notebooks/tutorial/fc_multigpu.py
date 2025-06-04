@@ -258,7 +258,8 @@ if __name__ == "__main__":
     os.environ["MKL_NUM_THREADS"] = "1"
     os.environ["OPENBLAS_NUM_THREADS"] = "1"
     # where the thingo stuff get saved
-    os.environ["ERA5LOWRESDEMO"] = os.path.join(os.environ["PBS_JOBFS"], "era5lowres")
+    if os.environ.get("ERA5LOWRESDEMO", None) is None:
+        os.environ["ERA5LOWRESDEMO"] = os.path.join(os.environ["PBS_JOBFS"], "era5lowres")
     # make the thingo directory
     os.makedirs(os.environ["ERA5LOWRESDEMO"], exist_ok=True)
     EXPERIMENT_VERSION="vHACK" # not actually used so I'm gonna call it whatever I want
