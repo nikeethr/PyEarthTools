@@ -1,0 +1,37 @@
+[project]
+name = "pet-t"
+version = "0.1.0"
+channels = ["conda-forge"]
+description = "Add a short description here"
+authors = ["Nikeeth Ramanathan <nikeeth.ramanathan@gmail.com>"]
+platforms = ["linux-64"]
+
+
+[dependencies]
+python = "<3.13"
+setuptools = "*"
+hatchling = "*"
+pip = "*"
+ipykernel = "*"
+jupyter = "*"
+pytest = "*"
+pytest-cov = "*"
+pytest-xdist = "*"
+pudb = "*"
+black = "*"
+isort = "*"
+pre-commit = "*"
+iniconfig = "*"
+gcsfs = "*"
+
+[pypi-dependencies]
+pyearthtools-utils = { path = "/g/data/kd24/nr4547/work/repos/PyEarthTools/packages/utils", editable = true }
+pyearthtools-data = { path = "/g/data/kd24/nr4547/work/repos/PyEarthTools/packages/data", editable = true }
+pyearthtools-pipeline = { path = "/g/data/kd24/nr4547/work/repos/PyEarthTools/packages/pipeline", editable = true }
+pyearthtools-archive-nci = { path = "/g/data/kd24/nr4547/work/repos/PyEarthTools/packages/nci_site_archive", editable = true }
+pyearthtools = { path = "/g/data/kd24/nr4547/work/repos/PyEarthTools", editable = true }
+pyearthtools-training = { path = "/g/data/kd24/nr4547/work/repos/PyEarthTools/packages/training", editable = true }
+pyearthtools-tutorial = { path = "/g/data/kd24/nr4547/work/repos/PyEarthTools/packages/tutorial", editable = true }
+pyearthtools-zoo = { path = "/g/data/kd24/nr4547/work/repos/PyEarthTools/packages/zoo", editable = true }
+pyearthtools-bundled-fourcastnext = { path = "/g/data/kd24/nr4547/work/repos/PyEarthTools/packages/bundled_models/fourcastnext", editable = true }
+xarray = { version = "*", extras = ["complete"] }

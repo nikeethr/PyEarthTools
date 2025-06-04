@@ -1,0 +1,20 @@
+export DASK_DISTRIBUTED__COMM__UCX__INFINIBAND=True
+export DASK_DISTRIBUTED__COMM__UCX__RDMACM=True
+export DASK_DISTRIBUTED__COMM__UCX__CREATE_CUDA_CONTEXT=True
+export DASK_DISTRIBUTED__COMM__UCX__CUDA_COPY=True
+export DASK_DISTRIBUTED__COMM__UCX__TCP=True
+
+export OMP_NUM_THREADS=1
+export MKL_NUM_THREADS=1
+export OPENBLAS_NUM_THREADS=1
+
+set -eux -o pipefail
+
+echo "------------------------------------------------------------
+echo "PREPPING pre-cached era5lowres file: mini.nc"
+echo "------------------------------------------------------------
+rm -rf ${PBS_JOBFS}/era5lowres
+mkdir -p ${PBS_JOBFS}/era5lowres 
+cp /g/data/eu56/nr4547/mini.nc ${PBS_JOBFS}/era5lowres 
+
+python FourCastMini_Demo.py

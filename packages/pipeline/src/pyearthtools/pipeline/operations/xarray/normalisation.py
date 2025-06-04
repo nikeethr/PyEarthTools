@@ -17,8 +17,19 @@ from abc import abstractmethod
 from pathlib import Path
 from typing import TypeVar, Union
 import os
+import functools
 
 import xarray as xr
+
+# [comment - NR] : merely for lock testing. Python could be using threads OR processes and its hard to tell, sometimes both.
+#                  I'm guessing its processes that need to be locked. In HPC, threads are processes anyway.
+#                  an alternate is to use a filelock...
+import multiprocessing as mp
+
+# [comment - NR]: define lock - I'm not sure if this is early enough...
+#                               I'm not sure if Lock is singleton - it really should be called near the entry point
+#
+_LOCK = mp.Lock()
 
 from pyearthtools.data.utils import parse_path
 
@@ -30,6 +41,11 @@ FILE = Union[str, Path]
 
 T = TypeVar("T", xr.Dataset, xr.DataArray)
 
+@functools.lru_cache
+def get_cached_file_data(f: FILE):
+    # lock will be bypassed if/when cache is hit - this is okay since there is no IO
+    with _LOCK:
+        return xr.load_dataset(parse_path(f))
 
 class xarrayNormalisation(Operation):
     """
@@ -41,7 +57,12 @@ class xarrayNormalisation(Operation):
     @classmethod
     def open_file(cls, file: FILE) -> xr.Dataset:
         """Open xarray file"""
-        return xr.open_dataset(parse_path(file))
+        # [comment - NR] fitting everything in memory for now - should use
+        #                cache instead, but its not super necessary since these
+        #                values should be static in theory
+        return get_cached_file_data(file)
+
+        # return xr.open_dataset(parse_path(file))
 
     def __init__(self):
         super().__init__(split_tuples=True, recursively_split_tuples=True, recognised_types=(xr.Dataset, xr.DataArray))
@@ -105,41 +126,44 @@ class MagicNorm(xarrayNormalisation):
         self.mean = None
         self.deviation = None
 
-        if os.path.exists(self.means_filename):
-            # print(f"Found file for {myid})")
-            self.mean = xr.load_dataset(self.means_filename)
-            self.deviation = xr.load_dataset(self.deviation_filename)
-            self.samples_needed = 0
+        # [comment - NR]: lock this
+        with _LOCK:
+            if os.path.exists(self.means_filename):
+                # print(f"Found file for {myid})")
+                self.mean = xr.load_dataset(self.means_filename)
+                self.deviation = xr.load_dataset(self.deviation_filename)
+                self.samples_needed = 0
 
     def update_norms(self, sample):
-
         # Return early if norms already well calculated
         if self.sample_count >= self.samples_needed:
             return
 
-        # This can happen in a multithreading situation
-        # Throw out own weights and all use the same pls
-        if os.path.exists(self.means_filename):
-            self.mean = xr.load_dataset(self.means_filename)
-            self.deviation = xr.load_dataset(self.deviation_filename)
-            self.samples_needed = 0
-
-        # Update the calculations
-        self.samples.append(sample)
-        self.sample_count = len(self.samples)
-        ds = xr.concat(self.samples, dim="samples")
-        self.mean = ds.mean()
-        self.deviation = ds.std()
-
-        # Cache to disk once we have enough data
-        if self.sample_count >= self.samples_needed:
+        # [comment - NR]: lock on update
+        with _LOCK:
+            # This can happen in a multithreading situation
+            # Throw out own weights and all use the same pls
             if os.path.exists(self.means_filename):
                 self.mean = xr.load_dataset(self.means_filename)
                 self.deviation = xr.load_dataset(self.deviation_filename)
                 self.samples_needed = 0
-            else:
-                self.mean.to_netcdf(self.means_filename)
-                self.deviation.to_netcdf(self.deviation_filename)
+
+            # Update the calculations
+            self.samples.append(sample)
+            self.sample_count = len(self.samples)
+            ds = xr.concat(self.samples, dim="samples")
+            self.mean = ds.mean()
+            self.deviation = ds.std()
+
+            # Cache to disk once we have enough data
+            if self.sample_count >= self.samples_needed:
+                if os.path.exists(self.means_filename):
+                    self.mean = xr.load_dataset(self.means_filename)
+                    self.deviation = xr.load_dataset(self.deviation_filename)
+                    self.samples_needed = 0
+                else:
+                    self.mean.to_netcdf(self.means_filename)
+                    self.deviation.to_netcdf(self.deviation_filename)
 
     def normalise(self, sample):
 
