@@ -315,17 +315,22 @@ class ERA5LowResDemoIndex(ArchiveIndex):
             return self.dataset
 
         # [comment - NR]:
-        # prefer netcdf4 - especially if to_netcdf ended up using netcdf4 engine by default (need to check this)
-        # don't use open_dataset without context handler (with open_dataset: ...) leads to context handler bugs
+        # prefer netcdf4 - especially if to_netcdf ended up using netcdf4
+        # engine by default (need to check this) don't use open_dataset without
+        # context handler (with open_dataset: ...) leads to context handler
+        # bugs
         
         # [comment - NR]:
         # I've temporarily replaced it with `load_dataset` - to avoid this
         # For a multi-dataset config we should be using an lru_cache or similar
+        # ds = xr.load_dataset(args[0][0], engine="netcdf4")
         
         # [comment - NR]:
         # If we really want to use open_dataset we have to chunk the data,
         # because currently the loader happens at the pytorch level which is too late.
-        ds = xr.load_dataset(args[0][0], engine="netcdf4")
+        # chunks = None doesn't remove chunking - it just disables dask,
+        # netcdflib still is capable of dealing with chunks
+        ds = xr.open_dataset(args[0][0], engine="netcdf4", chunks=None, cache=True)
         self.dataset = ds
 
         return self.dataset

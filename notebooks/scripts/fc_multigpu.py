@@ -192,7 +192,7 @@ def the_train(max_epochs):
     datamodule = pyearthtools.training.data.lightning.PipelineLightningDataModule(
         data_pipeline,
         **splits,
-        **{'num_workers': 8, 'batch_size': 64}
+        **{'num_workers': 4, 'batch_size': 64}
     )
 
     # Model module??
@@ -215,13 +215,23 @@ def the_train(max_epochs):
     )
     return _trainer
 
-def the_model():
+def the_model(ckpt_path=None):
     import fourcastnext
+    import functools
 
     _pipeline = the_pipe()
 
-    _model = fourcastnext.registered_model.FourCastNextRM(
+    _rm_base = fourcastnext.registered_model.FourCastNextRM
+    _RM = None
+
+    if ckpt_path is None:
+        _RM = _rm_base
+    else:
+        _RM = functools.partial(_rm_base, ckpt_path=ckpt_path)
+        
+    _model = _RM(
         pipeline=_pipeline,
+        ckpt_path=ckpt_path,
         lightning_model_params = {
           "img_size": (64, 32), # Increase this if using additional data
           "in_channels": 4,
@@ -240,11 +250,46 @@ def the_model():
 # ----------------------------------------------------------------------------
 # RUN
 # ----------------------------------------------------------------------------
-def do_it():
+def do_train():
     MAX_EPOCHS=2
     _train = the_train(MAX_EPOCHS)
     return _train.fit()
 
+def do_predict():
+    COMPARISON_BASE_TIME = '2011-03-01T00'
+    COMPARISON_ANALYSIS_TIME = '2011-03-01T06'
+    full_checkpoint_path = get_workdir() + '/chkpt/Checkpoints/Epoch/model-epoch=00.ckpt'
+    pmodel = the_model(full_checkpoint_path)
+    prediction = pmodel.run(COMPARISON_BASE_TIME)
+    accessor = the_data()
+
+    pmodel.run(COMPARISON_BASE_TIME)
+
+    # ANALYSE
+    analysis_pipeline = pyearthtools.pipeline.Pipeline(
+        accessor,
+        pyearthtools.data.transforms.coordinates.StandardLongitude(
+            type="-180-180",
+        ),
+        # fourcastnext.CropToRectangleSmall(),    
+        pyearthtools.pipeline.modifications.TemporalRetrieval(
+            concat=True,
+            samples=((0, 4, 6)),
+        ),
+    )
+
+    # PLOT MODEL PREDICTIONS
+    # These predictions were from training step 17,000. 
+    fcst_as_celcius = prediction['2m_temperature'] - 273.15
+    fcst_as_celcius.attrs["units"] = "deg C"
+    fcst_as_celcius.plot.savefig(x='longitude', y='latitude', col='time', col_wrap=4)
+    plt_truth.savefig("fc.png")
+
+    # PLOT ANALYSIS GRIDS (TRUTH)
+    an_as_celcius = analysis_pipeline[COMPARISON_ANALYSIS_TIME]['2m_temperature'] - 273
+    an_as_celcius.attrs["units"] = "deg C"
+    plt_truth = an_as_celcius.plot(x='longitude', y='latitude', col='time', col_wrap=4)
+    plt_truth.savefig("an.png")
 
 if __name__ == "__main__":
     # NAME GUARD ALL THE THINGS!
@@ -272,16 +317,35 @@ if __name__ == "__main__":
     print("--- CLEAN CACHE ---")
     print(" " * 60)
     clear_gpu_cache_and_stale_things()
+    print("... done")
+    print(" " * 60)
 
     # download data if needed
     print("--- ATTEMPT DOWNLOAD ---")
     print(" " * 60)
     download_mini_dataset()
-
-    print("--- CONFIGURE MODEL/DATA/PIPELIN/TRAINER ---")
-    do_it()
+    print("... done")
     print(" " * 60)
+
+    train = True
+    predict = True
+
+    if train:
+        print("--- TRAINING ---")
+        do_train()
+        print(" " * 60)
+        print("... done")
+        print(" " * 60)
+
+    if predict:
+        print("--- PREDICTING ---")
+        do_predict()
+        print(" " * 60)
+        print("... done")
+        print(" " * 60)
 
     print("--- CLEAN CACHE (again) ---")
     clear_gpu_cache_and_stale_things()
+    print(" " * 60)
+    print("... done")
     print(" " * 60)
