@@ -263,7 +263,8 @@ def do_predict():
     prediction = pmodel.run(COMPARISON_BASE_TIME)
     accessor = the_data()
 
-    pmodel.run(COMPARISON_BASE_TIME)
+    # PREDICT
+    prediction = pmodel.run(COMPARISON_BASE_TIME)
 
     # ANALYSE
     analysis_pipeline = pyearthtools.pipeline.Pipeline(
