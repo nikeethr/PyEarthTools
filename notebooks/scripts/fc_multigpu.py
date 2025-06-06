@@ -134,9 +134,8 @@ def the_pipe():
 
 
 
-def the_train(max_epochs):
+def the_train(max_epochs, ckpt_path=None):
     import pyearthtools.training
-
 
     trainer_configuration = {
       "precision": "32",
@@ -146,7 +145,7 @@ def the_train(max_epochs):
           "mode": "min",
           "dirpath": "{path}/Checkpoints/Train",
           "filename": "model-{epoch:02d}-{step:02d}",
-          "every_n_train_steps": 1000,
+          "every_n_train_steps": 50,
           "save_top_k": 10
         },
         {
@@ -154,7 +153,7 @@ def the_train(max_epochs):
           "mode": "min",
           "dirpath": "{path}/Checkpoints/Valid",
           "filename": "model-{epoch:02d}-{step:02d}-{valid_loss}",
-          "every_n_train_steps": 5000,
+          "every_n_train_steps": 100,
           "save_top_k": 10
         },
         {
@@ -174,10 +173,10 @@ def the_train(max_epochs):
     #   explicitly use Parallel Samplers
     #
     # Note: sure if defining forkserver here is necessary, but doing it anyway.
-    # from lightning.pytorch.strategies import DDPStrategy
     #
-    # _strategy = DDPStrategy(accelerator="gpu", start_method="forkserver")
-    _strategy = "ddp_fork"
+    from lightning.pytorch.strategies import DDPStrategy
+    _strategy = DDPStrategy(accelerator="gpu", start_method="forkserver")
+    # _strategy = "ddp_forkserver"
     # ---
 
     # Data module
@@ -189,14 +188,15 @@ def the_train(max_epochs):
         "valid_split": pyearthtools.pipeline.iterators.DateRange(
             2018, 2020, interval = "6 hours"),
     }
+
     datamodule = pyearthtools.training.data.lightning.PipelineLightningDataModule(
         data_pipeline,
         **splits,
-        **{'num_workers': 4, 'batch_size': 64}
+        **{'num_workers': 8, 'batch_size': 16}
     )
 
     # Model module??
-    model = the_model()
+    model = the_model(ckpt_path)
 
     checkpoint_path = os.path.join(os.environ["ERA5LOWRESDEMO"], "chkpt")
     os.makedirs(checkpoint_path, exist_ok=True)
@@ -213,6 +213,7 @@ def the_train(max_epochs):
         },
         **trainer_configuration,
     )
+
     return _trainer
 
 def the_model(ckpt_path=None):
@@ -231,7 +232,6 @@ def the_model(ckpt_path=None):
         
     _model = _RM(
         pipeline=_pipeline,
-        ckpt_path=ckpt_path,
         lightning_model_params = {
           "img_size": (64, 32), # Increase this if using additional data
           "in_channels": 4,
@@ -251,20 +251,23 @@ def the_model(ckpt_path=None):
 # RUN
 # ----------------------------------------------------------------------------
 def do_train():
-    MAX_EPOCHS=2
+    MAX_EPOCHS=12
     _train = the_train(MAX_EPOCHS)
     return _train.fit()
 
 def do_predict():
+    os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+
+    import torch
+    import pyearthtools.pipeline
+
     COMPARISON_BASE_TIME = '2011-03-01T00'
     COMPARISON_ANALYSIS_TIME = '2011-03-01T06'
-    full_checkpoint_path = get_workdir() + '/chkpt/Checkpoints/Epoch/model-epoch=00.ckpt'
+    full_checkpoint_path = get_workdir() + '/chkpt/Checkpoints/Train/model-epoch=10-step=6600.ckpt'
+
     pmodel = the_model(full_checkpoint_path)
     prediction = pmodel.run(COMPARISON_BASE_TIME)
     accessor = the_data()
-
-    # PREDICT
-    prediction = pmodel.run(COMPARISON_BASE_TIME)
 
     # ANALYSE
     analysis_pipeline = pyearthtools.pipeline.Pipeline(
@@ -283,14 +286,15 @@ def do_predict():
     # These predictions were from training step 17,000. 
     fcst_as_celcius = prediction['2m_temperature'] - 273.15
     fcst_as_celcius.attrs["units"] = "deg C"
-    fcst_as_celcius.plot.savefig(x='longitude', y='latitude', col='time', col_wrap=4)
-    plt_truth.savefig("fc.png")
+    plt_fc = fcst_as_celcius.plot(x='longitude', y='latitude', col='time', col_wrap=4)
+    plt_fc.fig.savefig("fc_4gpu_chkpt_10epoch.png")
 
     # PLOT ANALYSIS GRIDS (TRUTH)
     an_as_celcius = analysis_pipeline[COMPARISON_ANALYSIS_TIME]['2m_temperature'] - 273
     an_as_celcius.attrs["units"] = "deg C"
     plt_truth = an_as_celcius.plot(x='longitude', y='latitude', col='time', col_wrap=4)
-    plt_truth.savefig("an.png")
+    print(dir(plt_truth))
+    plt_truth.fig.savefig("an_4gpu_chkpt_10epoch.png")
 
 if __name__ == "__main__":
     # NAME GUARD ALL THE THINGS!
@@ -302,7 +306,6 @@ if __name__ == "__main__":
     # lock CPU threads so they don"t get in the way of IO, most compute should be on the GPU
     os.environ["OMP_NUM_THREADS"] = "1"
     os.environ["MKL_NUM_THREADS"] = "1"
-    os.environ["OPENBLAS_NUM_THREADS"] = "1"
     # where the thingo stuff get saved
     if os.environ.get("ERA5LOWRESDEMO", None) is None:
         os.environ["ERA5LOWRESDEMO"] = os.path.join(os.environ["PBS_JOBFS"], "era5lowres")
@@ -316,37 +319,29 @@ if __name__ == "__main__":
 
     # wipe cache before starting anything
     print("--- CLEAN CACHE ---")
-    print(" " * 60)
     clear_gpu_cache_and_stale_things()
     print("... done")
-    print(" " * 60)
 
     # download data if needed
     print("--- ATTEMPT DOWNLOAD ---")
-    print(" " * 60)
     download_mini_dataset()
     print("... done")
-    print(" " * 60)
 
-    train = True
-    predict = True
+    _can_train = True
+    _can_predict = True
 
-    if train:
+    if _can_train:
         print("--- TRAINING ---")
         do_train()
-        print(" " * 60)
         print("... done")
-        print(" " * 60)
+        print("--- CLEAN CACHE (again) ---")
+        clear_gpu_cache_and_stale_things()
+        print("... done")
 
-    if predict:
+    if _can_predict:
         print("--- PREDICTING ---")
         do_predict()
-        print(" " * 60)
         print("... done")
-        print(" " * 60)
-
-    print("--- CLEAN CACHE (again) ---")
-    clear_gpu_cache_and_stale_things()
-    print(" " * 60)
-    print("... done")
-    print(" " * 60)
+        print("--- CLEAN CACHE (again) ---")
+        clear_gpu_cache_and_stale_things()
+        print("... done")

@@ -17,11 +17,11 @@ echo "------------------------------------------------------------"
 echo "PREPPING pre-cached era5lowres file: mini.nc"
 echo "------------------------------------------------------------"
 export ERA5LOWRESDEMO=${PBS_JOBFS}/era5lowres
-export ERA5LOWRESDEMO=/g/data/eu56/nr4547/blah/era5lowres
+# export ERA5LOWRESDEMO=/g/data/eu56/nr4547/blah/era5lowres
 
 # ---
 # comment out this line to use checkpoints
-rm -rf $ERA5LOWRESDEMO || true
+# rm -rf $ERA5LOWRESDEMO || true
 # ---
 
 mkdir -p $ERA5LOWRESDEMO
